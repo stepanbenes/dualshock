@@ -38,7 +38,6 @@ fn get_central(manager: &Manager) -> ConnectedAdapter {
 
 fn main() {
     let _peripheral_address = btleplug::api::BDAddr::from_str("B8:27:EB:11:87:85").unwrap();
-    let _characteristic_uuid: u16 = 0xFFE1;
 
     let manager = Manager::new().unwrap();
 
@@ -56,7 +55,7 @@ fn main() {
     // Add ourselves to the central event handler output now, so we don't
     // have to carry around the Central object. We'll be using this in
     // connect anyways.
-    let _on_event = move |event: CentralEvent| match event {
+    let on_event = move |event: CentralEvent| match event {
         CentralEvent::DeviceDiscovered(bd_addr) => {
             println!("DeviceDiscovered: {:?}", bd_addr);
         }
@@ -68,6 +67,9 @@ fn main() {
         }
         _ => {}
     };
+    // bluetooth event handling
+    central.on_event(Box::new(on_event));
+    loop {}
 }
 
 // https://github.com/deviceplug/btleplug
