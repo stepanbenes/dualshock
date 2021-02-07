@@ -22,15 +22,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let devices = session.get_devices().await?;
     println!("Devices: {:#?}", devices);
 
-    //! Example to log Bluetooth events, including duplicate manufacturer-specific advertisement data.
+    // Example to log Bluetooth events, including duplicate manufacturer-specific advertisement data.
     //let (_, session) = BluetoothSession::new().await?;
-    
     let mut events = session.event_stream().await?;
-    session.start_discovery_with_filter(&DiscoveryFilter {
-                duplicate_data: Some(true),
-                ..DiscoveryFilter::default()
-            })
-            .await?;
+    session
+        .start_discovery_with_filter(&DiscoveryFilter {
+            duplicate_data: Some(true),
+            ..DiscoveryFilter::default()
+        })
+        .await?;
 
     println!("Events:");
     while let Some(event) = events.next().await {
