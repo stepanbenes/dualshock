@@ -1,78 +1,58 @@
-use btleplug::api::{Central, CentralEvent};
-#[cfg(target_os = "linux")]
-use btleplug::bluez::{adapter::ConnectedAdapter, manager::Manager};
-#[cfg(target_os = "macos")]
-use btleplug::corebluetooth::{adapter::Adapter, manager::Manager};
-#[cfg(target_os = "windows")]
-use btleplug::winrtble::{adapter::Adapter, manager::Manager};
-use std::str::FromStr;
-
-// adapter retrieval works differently depending on your platform right now.
-// API needs to be aligned.
-
-#[cfg(any(target_os = "windows", target_os = "macos"))]
-fn get_central(manager: &Manager) -> Adapter {
-    let adapters = manager.adapters().unwrap();
-    if adapters.len() <= 0 {
-        panic!("Bluetooth adapter(s) were NOT found, sorry...\n");
-    }
-    adapters.into_iter().nth(0).unwrap()
-}
-
-#[cfg(target_os = "linux")]
-fn get_central(manager: &Manager) -> ConnectedAdapter {
-    let adapters = manager.adapters().unwrap();
-    if adapters.len() <= 0 {
-        panic!("Bluetooth adapter(s) were NOT found, sorry...\n");
-    }
-    let mut adapter = adapters.into_iter().nth(0).unwrap();
-
-    // reset the adapter -- clears out any errant state
-    adapter = manager.down(&adapter).unwrap();
-    adapter = manager.up(&adapter).unwrap();
-
-    adapter
-        .connect()
-        .expect("Error connecting to BLE Adapter....")
-}
+use BlueZ::*;
 
 fn main() {
-    let _peripheral_address = btleplug::api::BDAddr::from_str("B8:27:EB:11:87:85").unwrap();
+    // Create a new session. This establishes the D-Bus connection to talk to BlueZ. In this case we
+    // ignore the join handle, as we don't intend to run indefinitely.
+    let (_, session) = BluetoothSession::new().await?;
 
-    let manager = Manager::new().unwrap();
+    // Start scanning for Bluetooth devices, and wait a few seconds for some to be discovered.
+    session.start_discovery().await?;
+    time::sleep(Duration::from_secs(5)).await;
+    session.stop_discovery().await?;
 
-    // get the first bluetooth adapter
-    // connect to the adapter
-    let central = get_central(&manager);
+    // Get a list of devices which are currently known.
+    let devices = session.get_devices().await?;
 
-    // start scanning for devices
-    central
-        .start_scan()
-        .expect("Can't scan BLE adapter for connected devices...");
-    // instead of waiting, you can use central.on_event to be notified of
-    // new devices
+    // Find the device we care about.
+    let device = devices
+        .into_iter()
+        .find(|device| device.name.as_deref() == Some("My device"))
+        .unwrap();
 
-    // Add ourselves to the central event handler output now, so we don't
-    // have to carry around the Central object. We'll be using this in
-    // connect anyways.
-    let on_event = move |event: CentralEvent| match event {
-        CentralEvent::DeviceDiscovered(bd_addr) => {
-            println!("DeviceDiscovered: {:?}", bd_addr);
+    // Connect to it.
+    session.connect(&device.id).await?;
+
+    // Look up a GATT service and characteristic by short UUIDs.
+    let service = session
+        .get_service_by_uuid(&device.id, uuid_from_u16(0x1234))
+        .await?;
+    let characteristic = session
+        .get_characteristic_by_uuid(&service.id, uuid_from_u32(0x1235))
+        .await?;
+
+    // Read the value of the characteristic and write a new value.
+    println!(
+        "Value: {:?}",
+        session
+            .read_characteristic_value(&characteristic.id)
+            .await?
+    );
+    session
+        .write_characteristic_value(&characteristic.id, vec![1, 2, 3])
+        .await?;
+
+    // Subscribe to notifications on the characteristic and print them out.
+    let mut events = session
+        .characteristic_event_stream(&characteristic.id)
+        .await?;
+    session.start_notify(&characteristic.id).await?;
+    while let Some(event) = events.next().await {
+        if let BluetoothEvent::Characteristic {
+            id,
+            event: CharacteristicEvent::Value { value },
+        } = event
+        {
+            println!("Update from {}: {:?}", id, value);
         }
-        CentralEvent::DeviceConnected(bd_addr) => {
-            println!("DeviceConnected: {:?}", bd_addr);
-        }
-        CentralEvent::DeviceDisconnected(bd_addr) => {
-            println!("DeviceDisconnected: {:?}", bd_addr);
-        }
-        _ => {}
-    };
-    // bluetooth event handling
-    central.on_event(Box::new(on_event));
-    loop {}
+    }
 }
-
-// https://github.com/deviceplug/btleplug
-// https://github.com/deviceplug/btleplug/blob/master/src/api/mod.rs
-// https://book.async.rs/
-// https://docs.rs/async-std/1.6.1/async_std/
