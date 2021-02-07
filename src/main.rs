@@ -21,13 +21,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Get the list of devices whose services are currently known and print them with their
     // characteristics.
-    let devices = session.get_devices().await?;
+    //let devices = session.get_devices().await?;
+
+    time::sleep(SCAN_DURATION).await;
+
     println!("Devices:");
     for device in devices {
-        println!("{:?}", device);
-        if device.paired {
-            session.connect(&device.id).await?;
-        }
+        //println!("{:?}", device);
         let services = session.get_services(&device.id).await?;
         if !services.is_empty() {
             println!("{}: {}", device.mac_address, device.id);
