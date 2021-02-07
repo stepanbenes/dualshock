@@ -37,7 +37,7 @@ fn get_central(manager: &Manager) -> ConnectedAdapter {
 }
 
 fn main() {
-    let _peripheral_address = btleplug::api::BDAddr::from_str("A4:AE:12:88:F9:11").unwrap();
+    let _peripheral_address = btleplug::api::BDAddr::from_str("B8:27:EB:11:87:85").unwrap();
     let _characteristic_uuid: u16 = 0xFFE1;
 
     let manager = Manager::new().unwrap();
