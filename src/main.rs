@@ -3,9 +3,7 @@ use std::ops::RangeInclusive;
 use std::str;
 
 #[tokio::main]
-async fn main() -> Result<(), eyre::Report> {
-    pretty_env_logger::init();
-
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (_, session) = BluetoothSession::new().await?;
 
     // Get the list of devices whose services are currently known and print them with their
