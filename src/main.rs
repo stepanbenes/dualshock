@@ -7,7 +7,7 @@ use tokio::time;
 const SCAN_DURATION: Duration = Duration::from_secs(5);
 
 #[tokio::main]
-async fn main() -> Result<(), std::error::Error> {
+async fn main() -> Result<T, Box<dyn std::error::Error>> {
     //pretty_env_logger::init();
 
     let (_, session) = BluetoothSession::new().await?;
