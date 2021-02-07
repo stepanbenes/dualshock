@@ -25,6 +25,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Devices:");
     for device in devices {
         println!("{:?}", device);
+        if device.paired {
+            session.connect(&device.id).await?;
+        }
         let services = session.get_services(&device.id).await?;
         if !services.is_empty() {
             println!("{}: {}", device.mac_address, device.id);
