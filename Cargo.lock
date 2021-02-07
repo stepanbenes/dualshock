@@ -88,6 +88,7 @@ name = "dualshock"
 version = "0.1.0"
 dependencies = [
  "bluez-async",
+ "tokio",
 ]
 
 [[package]]
