@@ -1,6 +1,7 @@
 //! Example to scan for a short time and then list all known devices.
 
-use bluez_async::BluetoothSession;
+use bluez_async::{BluetoothSession, DiscoveryFilter};
+use futures::stream::StreamExt;
 use std::time::Duration;
 use tokio::time;
 
@@ -20,6 +21,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Get the list of all devices which BlueZ knows about.
     let devices = session.get_devices().await?;
     println!("Devices: {:#?}", devices);
+
+    //! Example to log Bluetooth events, including duplicate manufacturer-specific advertisement data.
+    //let (_, session) = BluetoothSession::new().await?;
+    
+    let mut events = session.event_stream().await?;
+    session.start_discovery_with_filter(&DiscoveryFilter {
+                duplicate_data: Some(true),
+                ..DiscoveryFilter::default()
+            })
+            .await?;
+
+    println!("Events:");
+    while let Some(event) = events.next().await {
+        println!("{:?}", event);
+    }
 
     Ok(())
 }
