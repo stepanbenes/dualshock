@@ -1,6 +1,8 @@
 use bluez_async::{BleUuid, BluetoothSession, CharacteristicFlags};
 use std::ops::RangeInclusive;
 use std::str;
+use std::time::Duration;
+use tokio::time;
 
 const SCAN_DURATION: Duration = Duration::from_secs(5);
 
