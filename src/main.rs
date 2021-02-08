@@ -1,12 +1,44 @@
+extern crate ctrlc;
 extern crate joydev;
 
-use joydev::Device;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 
-fn main() {
-    // You should probably check what devices are available
-    // by reading /dev/input directory or using udev.
-    if let Ok(device) = Device::open("/dev/input/js0") {
-        // Get an event and print it.
-        println!("{:?}", device.get_event());
+use joydev::{Device, DeviceEvent, Error};
+
+fn main() -> Result<(), Error> {
+    let running = Arc::new(AtomicBool::new(true));
+
+    {
+        let r = running.clone();
+        ctrlc::set_handler(move || {
+            r.store(false, Ordering::SeqCst);
+        })
+        .expect("Error setting Ctrl-C handler");
     }
+
+    let device = Device::open("/dev/input/js0")?;
+    println!("{:#?}", device);
+
+    while running.load(Ordering::SeqCst) {
+        'inner: loop {
+            let event = match device.get_event() {
+                Err(error) => match error {
+                    Error::QueueEmpty => break 'inner,
+                    _ => panic!(
+                        "{}: {:?}",
+                        "called `Result::unwrap()` on an `Err` value", &error
+                    ),
+                },
+                Ok(event) => event,
+            };
+            match event {
+                DeviceEvent::Axis(ref event) => println!("{:?}", event),
+                DeviceEvent::Button(ref event) => println!("{:?}", event),
+            }
+        }
+        //println!("Queue empty");
+    }
+
+    Ok(())
 }
