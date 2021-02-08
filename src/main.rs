@@ -1,18 +1,50 @@
-extern crate dualshock4;
-extern crate hidapi;
+extern crate ctrlc;
+extern crate joydev;
 
-use hidapi::HidApi;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 
-fn main() {
-    let api = HidApi::new().expect("Failed to create HID API instance.");
+use joydev::{Device, DeviceEvent, Error};
 
-    //println!("{:?}", api.devices().len());
+// joydev repo: https://gitlab.com/gm666q/joydev-rs
 
-    let controller = dualshock4::get_device(&api).expect("Failed to open device");
+// how to run: 1. connect dualshock4 to raspberry
+//             2. sudo ds4drv --hidraw &
+//             3. sudo ./dualshock
 
-    loop {
-        let data = dualshock4::read(&controller).expect("Failed to read data");
+fn main() -> Result<(), Error> {
+    let running = Arc::new(AtomicBool::new(true));
 
-        println!("{:?}", data.buttons.dpad_left);
+    {
+        let r = running.clone();
+        ctrlc::set_handler(move || {
+            r.store(false, Ordering::SeqCst);
+        })
+        .expect("Error setting Ctrl-C handler");
     }
+
+    let device = Device::open("/dev/input/js0")?;
+    println!("{:#?}", device);
+
+    while running.load(Ordering::SeqCst) {
+        'inner: loop {
+            let event = match device.get_event() {
+                Err(error) => match error {
+                    Error::QueueEmpty => break 'inner,
+                    _ => panic!(
+                        "{}: {:?}",
+                        "called `Result::unwrap()` on an `Err` value", &error
+                    ),
+                },
+                Ok(event) => event,
+            };
+            match event {
+                DeviceEvent::Axis(ref event) => println!("{:?}", event),
+                DeviceEvent::Button(ref event) => println!("{:?}", event),
+            }
+        }
+        //println!("Queue empty");
+    }
+
+    Ok(())
 }
