@@ -6,6 +6,12 @@ use std::sync::Arc;
 
 use joydev::{Device, DeviceEvent, Error};
 
+// joydev repo: https://gitlab.com/gm666q/joydev-rs
+
+// how to run: 1. connect dualshock4 to raspberry
+//             2. sudo ds4drv --hidraw &
+//             3. sudo ./dualshock
+
 fn main() -> Result<(), Error> {
     let running = Arc::new(AtomicBool::new(true));
 
