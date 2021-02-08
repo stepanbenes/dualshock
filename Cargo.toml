@@ -8,4 +8,4 @@ edition = "2018"
 
 [dependencies]
 hidapi = "0.4.1"
-dualshock4 = "0.1.0"
+dualshock4 = "0.1.1"
