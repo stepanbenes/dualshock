@@ -1,5 +1,10 @@
 extern crate ctrlc;
 extern crate joydev;
+extern crate robust_arduino_serial;
+extern crate serial;
+
+use robust_arduino_serial::*;
+use serial::prelude::*;
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -13,6 +18,10 @@ use joydev::{Device, DeviceEvent, Error};
 //             3. sudo ./dualshock
 
 fn main() -> Result<(), Error> {
+    let serial_port = "/dev/ttyACM0";
+    println!("Opening port: {:?}", serial_port);
+    let mut port = serial::open(serial_port).unwrap();
+
     let running = Arc::new(AtomicBool::new(true));
 
     {
