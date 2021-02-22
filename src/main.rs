@@ -10,7 +10,9 @@ use std::time::Duration;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
-use joydev::{event_codes::Key, Device, DeviceEvent, Error};
+use joydev::{
+    event_codes::AbsoluteAxis, event_codes::Key, Device, DeviceEvent, Error, GenericEvent,
+};
 
 // joydev repo: https://gitlab.com/gm666q/joydev-rs
 // robust_arduino_serial example: https://github.com/araffin/rust-arduino-serial/blob/master/examples/arduino_serial.rs
@@ -66,8 +68,18 @@ fn main() -> Result<(), Error> {
                 Ok(event) => event,
             };
             match event {
-                DeviceEvent::Axis(ref _event) => {
-                    //println!("{:?}", event);
+                DeviceEvent::Axis(ref event) => {
+                    match event.axis() {
+                        AbsoluteAxis::Hat0X => {
+                            if event.value() < 10 {
+                                write_i8(&mut port, 'a' as i8).unwrap();
+                            }
+                        }
+                        _ => {
+                            // ignore
+                        }
+                    }
+                    println!("{:?}", event);
                 }
                 DeviceEvent::Button(ref event) => {
                     // see: https://gitlab.com/gm666q/joydev-rs/-/blob/master/joydev/src/event_codes/key.rs
