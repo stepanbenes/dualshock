@@ -1,4 +1,3 @@
-extern crate ctrlc;
 extern crate joydev;
 extern crate robust_arduino_serial;
 extern crate serial;
@@ -7,12 +6,11 @@ use robust_arduino_serial::*;
 use serial::prelude::*;
 use std::time::Duration;
 
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::thread;
 
-use joydev::{
-    event_codes::AbsoluteAxis, event_codes::Key, Device, DeviceEvent, Error, GenericEvent,
-};
+use joydev::{event_codes::AbsoluteAxis, event_codes::Key, Device, DeviceEvent, GenericEvent};
+
+use async_std::{channel, channel::TryRecvError, io, task};
 
 // joydev repo: https://gitlab.com/gm666q/joydev-rs
 // robust_arduino_serial example: https://github.com/araffin/rust-arduino-serial/blob/master/examples/arduino_serial.rs
@@ -31,75 +29,100 @@ const PORT_SETTINGS: serial::PortSettings = serial::PortSettings {
     flow_control: serial::FlowNone,
 };
 
-fn main() -> Result<(), Error> {
+enum Notification {
+    ControllerButton(joydev::ButtonEvent),
+    ControllerAxis(joydev::AxisEvent),
+    SerialInput(u8),
+    NetworkCommand(String),
+}
+
+#[async_std::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // open serial port >>
     let serial_port = "/dev/ttyACM0";
     println!("Opening port: {:?}", serial_port);
-    let mut port = serial::open(serial_port).unwrap();
-    port.configure(&PORT_SETTINGS).unwrap();
+    let mut port = serial::open(serial_port)?;
+    port.configure(&PORT_SETTINGS)?;
     // timeout of 30s
-    port.set_timeout(Duration::from_secs(30)).unwrap();
-
-    let running = Arc::new(AtomicBool::new(true));
-
-    // setup CTRL+C intrerrupt
-    {
-        let r = running.clone();
-        ctrlc::set_handler(move || {
-            r.store(false, Ordering::SeqCst);
-        })
-        .expect("Error setting Ctrl-C handler");
-    }
+    port.set_timeout(Duration::from_secs(30))?;
 
     // open joistick controller
     let device = Device::open("/dev/input/js0")?;
     println!("{:#?}", device);
 
-    while running.load(Ordering::SeqCst) {
-        'inner: loop {
-            let event = match device.get_event() {
+    let (sender, receiver) = channel::unbounded::<Notification>();
+
+    // Dualshock PS4 controller events
+    {
+        let dualshock_sender = sender.clone();
+        thread::spawn(move || loop {
+            match device.get_event() {
                 Err(error) => match error {
-                    Error::QueueEmpty => break 'inner,
+                    joydev::Error::QueueEmpty => (), // TODO: wait?
                     _ => panic!(
                         "{}: {:?}",
                         "called `Result::unwrap()` on an `Err` value", &error
                     ),
                 },
-                Ok(event) => event,
-            };
-            match event {
-                DeviceEvent::Axis(ref event) => {
-                    match event.axis() {
-                        AbsoluteAxis::Hat0X => {
-                            if event.value() < 10 {
-                                write_i8(&mut port, 'a' as i8).unwrap();
-                            }
+                Ok(event) => {
+                    match event {
+                        DeviceEvent::Axis(event) => {
+                            let s = dualshock_sender.clone();
+                            task::spawn(async move {
+                                s.send(Notification::ControllerAxis(event)).await.unwrap();
+                            });
                         }
-                        _ => {
-                            // ignore
-                        }
-                    }
-                    println!("{:?}", event);
-                }
-                DeviceEvent::Button(ref event) => {
-                    // see: https://gitlab.com/gm666q/joydev-rs/-/blob/master/joydev/src/event_codes/key.rs
-                    println!("{:?}", event);
-                    match event.button() {
-                        Key::ButtonNorth => {
-                            write_i8(&mut port, 'f' as i8).unwrap();
-                        }
-                        Key::ButtonSouth => {
-                            write_i8(&mut port, 's' as i8).unwrap();
-                        }
-                        _ => {
-                            // ignore
+                        DeviceEvent::Button(event) => {
+                            // see: https://gitlab.com/gm666q/joydev-rs/-/blob/master/joydev/src/event_codes/key.rs
+                            let s = dualshock_sender.clone();
+                            task::spawn(async move {
+                                s.send(Notification::ControllerButton(event)).await.unwrap();
+                            });
                         }
                     }
                 }
             }
-        }
-        //println!("Queue empty");
+        });
     }
 
-    Ok(())
+    // serial port reciever
+    {
+        let serial_port_sender = sender.clone();
+        thread::spawn(move || loop {
+            match read_i8(&mut port) {
+                Ok(byte) => {
+                    let s = serial_port_sender.clone();
+                    task::spawn(async move {
+                        s.send(Notification::SerialInput(byte as u8)).await.unwrap();
+                    });
+                }
+                _ => panic!(),
+            }
+        });
+    }
+
+    // TODO: network reveiver
+    {}
+
+    // event processor
+    {
+        loop {
+            let result = receiver.recv().await;
+            //println!("Received: {:?}", result);
+            if let Ok(notification) = result {
+                match notification {
+                    Notification::ControllerButton(button) => {
+                        //write_i8(&mut port, 's' as i8);
+                    }
+                    Notification::ControllerAxis(axis) => {}
+                    Notification::SerialInput(data) => {}
+                    Notification::NetworkCommand(_data) => {
+                        unimplemented!()
+                    }
+                }
+            }
+        }
+    }
+
+    unreachable!()
 }

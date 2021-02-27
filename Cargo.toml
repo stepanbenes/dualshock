@@ -8,6 +8,6 @@ edition = "2018"
 
 [dependencies]
 joydev = "0.3.1"
-ctrlc = "3.1.7"
 serial = "0.4.0"
 robust-arduino-serial = "0.1.1"
+async-std = { version = "1.9.0", features = ["attributes"] }
