@@ -113,6 +113,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 match notification {
                     Notification::ControllerButton(button) => {
                         //write_i8(&mut port, 's' as i8);
+                        // TODO: https://stackoverflow.com/questions/53440321/how-to-use-serial-port-in-multiple-threads-in-rust
                     }
                     Notification::ControllerAxis(axis) => {}
                     Notification::SerialInput(data) => {}
