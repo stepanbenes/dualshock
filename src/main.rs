@@ -56,6 +56,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     {
         let dualshock_sender = sender.clone();
         thread::spawn(move || loop {
+            // TODO: is it blocking? If not, it does not need a separate thread
             match device.get_event() {
                 Err(error) => match error {
                     joydev::Error::QueueEmpty => (), // TODO: wait?
