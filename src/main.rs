@@ -50,6 +50,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let device = Device::open("/dev/input/js0")?;
     println!("{:#?}", device);
 
+    // TODO: use std::sync::mpsc::channel (no need for async if the threads are spawned anyway)
+    // see: https://www.youtube.com/watch?v=b4mS5UPHh20
     let (sender, receiver) = channel::unbounded::<Notification>();
 
     // Dualshock PS4 controller events
