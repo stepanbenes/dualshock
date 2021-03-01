@@ -109,6 +109,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // event processor
     {
+        // TODO: use iterator on Reciever
         loop {
             let result = receiver.recv().await;
             //println!("Received: {:?}", result);
